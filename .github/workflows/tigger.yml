@@ -34,7 +34,7 @@ jobs:
       - name: Get latest commit hash from Shiro repository
         id: get_latest_hash
         run: |
-          latest_hash=$(git ls-remote https://github.com/Ssttar/TechTrek.git HEAD | awk '{ print $1 }')
+          latest_hash=$(git ls-remote https://github.com/innei-dev/Shiroi.git HEAD | awk '{ print $1 }')
           echo "latest_hash=$latest_hash" >> "$GITHUB_OUTPUT"
 
       - name: Compare hashes
