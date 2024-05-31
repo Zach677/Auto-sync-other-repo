@@ -3,22 +3,52 @@ name: Monitor Shiro push
 on:
   schedule:
     - cron: '*/5 * * * *' # 每5分钟运行一次
-  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  HASH_FILE: build_hash
 
 jobs:
   monitor:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Check for new commits in Shiro
+      - name: Checkout current repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Read existing HASH_FILE content
+        id: read_hash
         run: |
-          last_commit_sha=$(curl -s https://api.github.com/repos/innei-dev/Shiroi/commits | jq -r '.[0].sha')
-          echo "SHA=$last_commit_sha" >> $GITHUB_ENV
+          content=$(cat ${{ env.HASH_FILE }}) || true
+          echo "hash_content=$content" >> "$GITHUB_OUTPUT"
+
+      - name: Check for new commits in Shiro
+        id: get_latest_hash
+        run: |
+          latest_hash=$(curl -s https://api.github.com/repos/innei-dev/Shiroi/commits | jq -r '.[0].sha')
+          echo "latest_hash=$latest_hash" >> "$GITHUB_OUTPUT"
+
+      - name: Compare hashes
+        id: hash_compare
+        env:
+          LATEST_HASH: ${{ steps.get_latest_hash.outputs.latest_hash }}
+          CURRENT_HASH: ${{ steps.read_hash.outputs.hash_content }}
+        run: |
+          if [ "$LATEST_HASH" != "$CURRENT_HASH" ]; then
+            echo "hash_changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "hash_changed=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Trigger workflow in Another Repository
-        if: env.SHA != ''
+        if: steps.hash_compare.outputs.hash_changed == 'true'
         run: |
-          #Set the required variables
+          # Set the required variables
           repo_owner="Ssttar"
           repo_name="Shiroi"
           event_type="tigger-workflow"
@@ -29,28 +59,19 @@ jobs:
             -H "Authorization: token ${{ secrets.PAT }}" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
             https://api.github.com/repos/$repo_owner/$repo_name/dispatches \
-            -d '{"event_type": "'"$event_type"'", "client_payload": {"ref": "'"$SHA"'"}}'
+            -d '{"event_type": "'"$event_type"'", "client_payload": {"ref": "'"$LATEST_HASH"'"}}'
 
-      - name: Checkout current repository
-        uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-          fetch-depth: 0
-
-      - name: Write hash to file
+      - name: Write new hash to file
+        if: steps.hash_compare.outputs.hash_changed == 'true'
         env:
-          SHA: ${{ env.SHA }}
-        run: echo $SHA > build_hash
+          LATEST_HASH: ${{ steps.get_latest_hash.outputs.latest_hash }}
+        run: echo $LATEST_HASH > ${{ env.HASH_FILE }}
 
-      - name: Commit files
+      - name: Commit and push new hash file
+        if: steps.hash_compare.outputs.hash_changed == 'true'
         run: |
-          git config --local user.email "bot@ssstttar.com"
-          git config --local user.name "Star_bot"
-          git add build_hash
-          git commit -a -m "Update hash file"
-
-      - name: Push changes
-        uses: ad-m/github-push-action@master
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          branch: ${{ github.ref }}
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add ${{ env.HASH_FILE }}
+          git commit -m "Update hash file to ${{ steps.get_latest_hash.outputs.latest_hash }}"
+          git push https://${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref }}
