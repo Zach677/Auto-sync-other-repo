@@ -65,17 +65,21 @@ jobs:
             https://api.github.com/repos/$repo_owner/$repo_name/dispatches \
             -d '{"event_type": "'"$event_type"'", "client_payload": {"ref": "'"$LATEST_HASH"'"}}'
 
-      - name: Write new hash to file
+      - name: Write hash to file
         if: steps.hash_compare.outputs.hash_changed == 'true'
         env:
           LATEST_HASH: ${{ steps.get_latest_hash.outputs.latest_hash }}
         run: echo $LATEST_HASH > ${{ env.HASH_FILE }}
 
-      - name: Commit and push new hash file
+      - name: Commit files
         if: steps.hash_compare.outputs.hash_changed == 'true'
         run: |
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
+          git config --local user.email "bot@ssstttar.com"
+          git config --local user.name "Star_bot"
           git add ${{ env.HASH_FILE }}
-          git commit -m "Update hash file to ${{ steps.get_latest_hash.outputs.latest_hash }}"
-          git push https://${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref }}
+          git commit -a -m "Update hash file"
+      - name: Push changes
+        uses: ad-m/github-push-action@master
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          branch: ${{ github.ref }}
