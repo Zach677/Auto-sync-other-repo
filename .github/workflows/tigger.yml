@@ -56,6 +56,8 @@ jobs:
             echo "hash_changed=true" >> "$GITHUB_OUTPUT"
           else
             echo "hash_changed=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "latest_hash=$LATEST_HASH" >> "$GITHUB_OUTPUT"
 
   monitor:
     name: Monitor and Execute
@@ -94,7 +96,7 @@ jobs:
           git config --local user.email "bot@ssstttar.com"
           git config --local user.name "Star_bot"
           git add ${{ env.HASH_FILE }}
-          git commit -a -m "Update hash file"
+          git commit -a -m "Update hash file to $LATEST_HASH"
 
       - name: Push changes
         uses: ad-m/github-push-action@master
