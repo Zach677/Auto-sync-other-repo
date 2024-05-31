@@ -1,6 +1,9 @@
 name: Monitor Shiro push
 
 on:
+  push:
+    branches:
+      - main
   schedule:
     - cron: '*/5 * * * *' # 每5分钟运行一次
   workflow_dispatch:
@@ -28,10 +31,10 @@ jobs:
           content=$(cat ${{ env.HASH_FILE }}) || true
           echo "hash_content=$content" >> "$GITHUB_OUTPUT"
 
-      - name: Check for new commits in Shiro
+      - name: Get latest commit hash from Shiro repository
         id: get_latest_hash
         run: |
-          latest_hash=$(curl -s https://api.github.com/repos/innei-dev/Shiroi/commits | jq -r '.[0].sha')
+          latest_hash=$(git ls-remote https://github.com/innei-dev/Shiroi.git HEAD | awk '{ print $1 }')
           echo "latest_hash=$latest_hash" >> "$GITHUB_OUTPUT"
 
       - name: Compare hashes
