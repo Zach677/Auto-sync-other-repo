@@ -15,8 +15,13 @@ env:
   HASH_FILE: build_hash
 
 jobs:
-  monitor:
+  check_hash:
+    name: Check Hash
     runs-on: ubuntu-latest
+    if: ${{ github.event.head_commit.message != 'Update hash file' }}
+    outputs:
+      hash_changed: ${{ steps.hash_compare.outputs.hash_changed }}
+      latest_hash: ${{ steps.get_latest_hash.outputs.latest_hash }}
 
     steps:
       - name: Checkout current repository
@@ -28,7 +33,11 @@ jobs:
       - name: Read existing HASH_FILE content
         id: read_hash
         run: |
-          content=$(cat ${{ env.HASH_FILE }}) || true
+          if [ -f ${{ env.HASH_FILE }} ]; then
+            content=$(cat ${{ env.HASH_FILE }})
+          else
+            content=""
+          fi
           echo "hash_content=$content" >> "$GITHUB_OUTPUT"
 
       - name: Get latest commit hash from Shiro repository
@@ -47,10 +56,20 @@ jobs:
             echo "hash_changed=true" >> "$GITHUB_OUTPUT"
           else
             echo "hash_changed=false" >> "$GITHUB_OUTPUT"
-          fi
+
+  monitor:
+    name: Monitor and Execute
+    needs: check_hash
+    runs-on: ubuntu-latest
+    if: needs.check_hash.outputs.hash_changed == 'true'
+    steps:
+      - name: Checkout current repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
 
       - name: Trigger workflow in Another Repository
-        if: steps.hash_compare.outputs.hash_changed == 'true'
         run: |
           # Set the required variables
           repo_owner="Ssttar"
@@ -63,21 +82,20 @@ jobs:
             -H "Authorization: token ${{ secrets.PAT }}" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
             https://api.github.com/repos/$repo_owner/$repo_name/dispatches \
-            -d '{"event_type": "'"$event_type"'", "client_payload": {"ref": "'"$LATEST_HASH"'"}}'
+            -d '{"event_type": "'"$event_type"'", "client_payload": {"ref": "'"${{ needs.check_hash.outputs.latest_hash }}"'"}}'
 
       - name: Write hash to file
-        if: steps.hash_compare.outputs.hash_changed == 'true'
         env:
-          LATEST_HASH: ${{ steps.get_latest_hash.outputs.latest_hash }}
+          LATEST_HASH: ${{ needs.check_hash.outputs.latest_hash }}
         run: echo $LATEST_HASH > ${{ env.HASH_FILE }}
 
       - name: Commit files
-        if: steps.hash_compare.outputs.hash_changed == 'true'
         run: |
           git config --local user.email "bot@ssstttar.com"
           git config --local user.name "Star_bot"
           git add ${{ env.HASH_FILE }}
           git commit -a -m "Update hash file"
+
       - name: Push changes
         uses: ad-m/github-push-action@master
         with:
