@@ -25,9 +25,9 @@ jobs:
 
     steps:
       - name: Checkout current repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
         with:
-          persist-credentials: false
+          persist-credentials: true
           fetch-depth: 0
 
       - name: Read existing HASH_FILE content
@@ -38,6 +38,7 @@ jobs:
           else
             content=""
           fi
+          echo "hash_content=$content" >> "$GITHUB_ENV"
           echo "hash_content=$content" >> "$GITHUB_OUTPUT"
 
       - name: Get latest commit hash from Shiro repository
@@ -66,9 +67,9 @@ jobs:
     if: needs.check_hash.outputs.hash_changed == 'true'
     steps:
       - name: Checkout current repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
         with:
-          persist-credentials: false
+          persist-credentials: true
           fetch-depth: 0
 
       - name: Trigger workflow in Another Repository
@@ -76,7 +77,7 @@ jobs:
           # Set the required variables
           repo_owner="Ssttar"
           repo_name="Shiroi"
-          event_type="tigger-workflow"
+          event_type="trigger-workflow"
 
           curl -L \
           -X POST \
@@ -96,7 +97,7 @@ jobs:
           git config --local user.email "bot@ssstttar.com"
           git config --local user.name "Star_bot"
           git add ${{ env.HASH_FILE }}
-          git commit -a -m "Update hash file to $LATEST_HASH"
+          git commit -m "Update hash file to ${{ needs.check_hash.outputs.latest_hash }}"
 
       - name: Push changes
         uses: ad-m/github-push-action@master
